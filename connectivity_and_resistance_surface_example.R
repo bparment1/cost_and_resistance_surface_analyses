@@ -161,6 +161,72 @@ plot(raster(tr3))
 
 ###### Let's make a mock example:
 
+sP <- cbind(c(-100,-100,100),c(50,-50,50))
+
+points <- SpatialPoints(sP)
+  
+plot(raster(tr3C))
+plot(points,add=T)
+text(points,c(1,2,3))
+
+costDistance(tr3C, sP)
+commuteDistance(tr3R, sP)
+
+rSPDistance(tr3R, sP, sP, theta=1e-12, totalNet="total")
+
+##### PASSAGE
+
+origin <- SpatialPoints(cbind(0, 0))
+rSPraster <- passage(tr3C, origin, sP[1,], theta=3)
+
+rSPraster
+plot(rSPraster)
+text(points[1,],"sP1")
+text(origin,"O")
+
+### Non overlapping trajectories
+
+r1 <- passage(tr3C, origin, sP[1,], theta=1)
+r2 <- passage(tr3C, origin, sP[2,], theta=1)
+rJoint <- min(r1, r2)
+rDiv <- max(max(r1, r2) * (1 - min(r1, r2)) - min(r1, r2), 0)
+
+#### Hiking example
+
+r <- raster(system.file("external/maungawhau.grd", package="gdistance"))
+plot(r)
+
+
+#The Hiking Function requires the slope (m) as input, which can be calculated from the altitude
+#(z) and distance between cell centres (d).
+#mij = (zj − zi)/dij
+#The units of altitude and distance should be identical. Here, we use meters for both. First, we
+#calculate the altitudinal differences between cells. Then we use the geoCorrection function
+#to divide by the distance between cells.
+
+altDiff <- function(x){x[2] - x[1]}
+hd <- transition(r, altDiff, 8, symm=FALSE)
+slope <- geoCorrection(hd)
+
+plot(raster(slope))
+
+adj <- adjacent(r, cells=1:ncell(r), pairs=TRUE, directions=8) 
+speed <- slope
+speed[adj] <- 6 * exp(-3.5 * abs(slope[adj] + 0.05)) #Tobbler Hiking function
+Conductance <- geoCorrection(speed)
+
+plot(raster(Conductance))
+
+A <- c(2667670, 6479000)
+B <- c(2667800, 6479400)
+AtoB <- shortestPath(Conductance, A, B, output="SpatialLines")
+BtoA <- shortestPath(Conductance, B, A, output="SpatialLines")
+
+plot(r, xlab="x coordinate (m)", ylab="y coordinate (m)",legend.lab="Altitude (masl)")
+lines(AtoB, col="red", lwd=2)
+lines(BtoA, col="blue")
+text(A[1] - 10, A[2] - 10, "A")
+text(B[1] + 10, B[2] + 10, "B")
 
 
 ###################### END OF SCRIPT ################
