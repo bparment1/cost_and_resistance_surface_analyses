@@ -228,5 +228,69 @@ lines(BtoA, col="blue")
 text(A[1] - 10, A[2] - 10, "A")
 text(B[1] + 10, B[2] + 10, "B")
 
+class(rbind(A,B))
+net_sp <- SpatialPoints(rbind(A,B))
+plot(net_sp,add=T)
+commuteDistance(Conductance,net_sp) 
+#> commuteDistance(Conductance,net_sp)
+#Error in .rD(x, coords) : 
+#  symmetric transition matrix required (dsCMatrix) in TransitionLayer object x
+
+### Add a point
+
+C <- c(2667899,6478800)
+net2_sp <- SpatialPoints(rbind(A,B,C))
+plot(r, xlab="x coordinate (m)", ylab="y coordinate (m)",legend.lab="Altitude (masl)")
+plot(net2_sp,add=T)
+test <- shortestPath(Conductance, net2_sp, net2_sp, output="SpatialLines")
+
+dist_test <- distance(r,net2_sp)
+dist_test <- distanceFromPoints(r,net2_sp)
+
+AtoB <- shortestPath(Conductance, A, B, output="SpatialLines")
+BtoA <- shortestPath(Conductance, B, A, output="SpatialLines")
+#Add new path/route
+BtoC <- shortestPath(Conductance, B, C, output="SpatialLines")
+CtoB <- shortestPath(Conductance, B, C, output="SpatialLines")
+#Add new path/route
+AtoC <- shortestPath(Conductance, A, C, output="SpatialLines")
+CtoA <- shortestPath(Conductance, C, A, output="SpatialLines")
+
+plot(r, xlab="x coordinate (m)", ylab="y coordinate (m)",legend.lab="Altitude (masl)")
+lines(AtoB, col="red", lwd=2)
+lines(BtoA, col="blue")
+text(A[1] - 10, A[2] - 10, "A")
+text(B[1] + 10, B[2] + 10, "B")
+plot(CtoB,col="red",add=T)
+plot(BtoC,col="black",add=T)
+text(C[1] -10, C[2] - 10, "C")
+plot(AtoC,col="black",add=T)
+plot(CtoA,col="red",add=T)
+
+pt_test <- st_point(1:2)
+
+r_passage_AB <- passage(Conductance, A, B, theta=10)#not sensible
+plot(r_passage_AB)
+r_passage_AB <- passage(Conductance, A, B, theta=3) #it constraints the path
+
+theta_val <- c(0.1,2,3)
+list_r_passage_AB <- lapply(1:length(theta_val),function(x){passage(x=Conductance,
+                                                                    origin=A,
+                                                                    goal=B,
+                                                                    theta=x)})
+r_passages_stack <- stack(list_r_passage_AB)
+names(r_passages_stack) <- theta_val
+plot(r_passages_stack)
+
+### Now full figure:
+
+plot(r_passage_AB)
+text(A[1] - 10, A[2] - 10, "A")
+text(B[1] + 10, B[2] + 10, "B")
+plot(AtoB,col="black",add=T)
+plot(BtoA,col="red",add=T)
+
+### Generate example with Oregon data?
+
 
 ###################### END OF SCRIPT ################
