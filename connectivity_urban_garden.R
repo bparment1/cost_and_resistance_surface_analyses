@@ -41,7 +41,7 @@ library(foreign) # import datasets from SAS, spss, stata and other sources
 library(classInt) #methods to generate class limits
 library(plyr) #data wrangling: various operations for splitting, combining data
 library(readxl) #functionalities to read in excel type data
-library(gdistance)
+library(gdistance) #package
 
 ###### Functions used in this script
 
@@ -101,10 +101,32 @@ r_bio <- raster(file.path(in_dir,biosurf_fname)) #<- "BioSurfaceFinal.tif"
 r_origin_garden <- raster(file.path(in_dir,origin_garden_node_fname)) #<- "OrigGardenNodes.tif"
 r_new_node <- raster(file.path(in_dir,new_node_fname)) # <- "NewNodes.tif"
 
+plot(r_origin_garden)
+
+origin_garden_node_fname<- "OrigGardenNodes.tif"
+
+## 1) Check if we can use point for origin?
+
+
 stack(r_origin,r_bio,r_origin_garden,r_new_node)
 
-plot(r_origin)
+r_test <- r_bio + 28
+r_origin
+NAvalue(r_origin) <- 0
 
+plot(r_origin)
+plot(r_bio)
+
+tr1_origin <- transition(r_origin,transitionFunction = mean,directions=8)
+tr1_origin <- transition(r_test,transitionFunction = mean,directions=8)
+
+
+freq_origin_tb<- freq(r_origin_garden)
+
+system("gdal_polygonize.py ")
+
+cmd_str <- "gdal_polygonize.py input.asc -f 'GeoJSON' output.json"
+cmd_str <- "gdal_polygonize.py OrigGardenNodes.tif -f 'ESRI SHapefile' OrigGardenNodes.shp"
 
 
 ######################## End of Script ###########################
