@@ -42,6 +42,8 @@ library(classInt) #methods to generate class limits
 library(plyr) #data wrangling: various operations for splitting, combining data
 library(readxl) #functionalities to read in excel type data
 library(gdistance) #package
+library(rgrass7)
+
 
 ###### Functions used in this script
 
@@ -66,6 +68,18 @@ create_dir_fun <- function(outDir,out_suffix=NULL){
 
 in_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden"
 out_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/outputs"
+in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden" 
+in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/grass_data_urban_garden"
+
+# background reading:
+# https://grass.osgeo.org/grass72/manuals/grass_database.html
+
+gisBase <- '/usr/lib/grass72'
+#gisDbase <- '/nfs/urbangi-data/grassdata'
+gisDbase <- in_dir_grass
+
+#location <- 'DEM_LiDAR_1ft_2010_Improved_NYC_int'
+location <- 'NYC_example'
 
 origin_fname <-  "OrigNYCSurface.tif"
 biosurf_fname <- "BioSurfaceFinal.tif"
@@ -92,6 +106,15 @@ if(create_out_dir_param==TRUE){
 }else{
   setwd(out_dir) #use previoulsy defined directory
 }
+
+
+# initialize a mapset for watershed estimation results
+initGRASS(gisBase = gisBase, #application location
+          gisDbase = gisDbase,  #database dir
+          location = location, #grass location
+          mapset = 'nyc_site', # grass mapset
+          override = TRUE
+)
 
 ####  PART I: EXPLORE DATA READ AND DISPLAY INPUTS #######
 
@@ -121,12 +144,75 @@ tr1_origin <- transition(r_origin,transitionFunction = mean,directions=8)
 tr1_origin <- transition(r_test,transitionFunction = mean,directions=8)
 
 
-freq_origin_tb<- freq(r_origin_garden)
+freq_origin_tb<- as.data.frame(freq(r_origin_garden))
+freq_new_node_tb<- as.data.frame(freq(r_new_node))
 
-system("gdal_polygonize.py ")
+#class(freq_origin_tb)
 
-cmd_str <- "gdal_polygonize.py input.asc -f 'GeoJSON' output.json"
+write.table(freq_origin_tb,"freq_origin_tb.txt",sep=",")
+write.table(freq_new_node_tb,"new_node_tb.txt",sep=",")
+
+setwd(in_dir)
+#cmd_str <- "gdal_polygonize.py input.asc -f 'GeoJSON' output.json"
 cmd_str <- "gdal_polygonize.py OrigGardenNodes.tif -f 'ESRI SHapefile' OrigGardenNodes.shp"
+
+system(cmd_str)
+
+orig_nodes_sf <- st_read("OrigGardenNodes.shp")
+
+plot(orig_nodes_sf)
+#View(orig_nodes_sf)
+
+new_node_fname <- "NewNodes.tif"
+
+cmd_str <- "gdal_polygonize.py NewNodes.tif -f 'ESRI SHapefile' NewNodes.shp"
+
+system(cmd_str)
+
+new_nodes_sf <- st_read("NewNodes.shp")
+plot(new_nodes_sf)
+dim(new_nodes_sf)
+#View(new_node_fname)
+dim(freq_new_node_tb)
+View(new_nodes_sf)
+
+#https://gis.stackexchange.com/questions/112304/how-to-create-least-cost-path-between-two-polygons-with-grass
+#https://stackoverflow.com/questions/9605827/least-cost-path-with-multiple-points
+#https://grasswiki.osgeo.org/wiki/Working_with_external_data_in_GRASS_7
+#http://ncsu-geoforall-lab.github.io/geospatial-modeling-course/grass/buffers_cost.html
+
+# register (rather than import) a GeoTIFF file in GRASS GIS:
+#r.external input=terra_lst1km20030314.LST_Day.tif output=modis_celsius
+#r_bio <- raster(file.path(in_dir,biosurf_fname)) #<- "BioSurfaceFinal.tif"
+
+#cmd_str <- paste("r.external")
+#cmd_str <- "r.external input="
+#system()
+# define output directory for files resulting from subsequent calculations:
+#r.external.out directory=$HOME/gisoutput/ format="GTiff"
+
+# perform calculations (here: extract pixels > 20 deg C)
+# store output directly as GeoTIFF file, hence add the .tif extension:
+#r.mapcalc "warm.tif = if(modis_celsius > 20.0, modis_celsius, null() )"
+
+# cease GDAL output connection and turn back to write standard GRASS raster files:
+#r.external.out -r
+
+# use the result elsewhere
+#qgis $HOME/gisoutput/warm.tif
+
+r.in.gdal input=E:\cdnh43e_v1.1r1.tif output=cdnh43e_v1 location=LCC
+Now run:
+
+execGRASS("r.cost",)
+
+g.region raster=cdnh43e_v1
+
+st_centroid()
+execGRASS("r.cost",)
+
+try(r_costexec <- execGRASS("r.stats", input = "fire_blocksgg", # no such file
+                     flags = c("C", "n")), silent=FALSE)
 
 
 ######################## End of Script ###########################
