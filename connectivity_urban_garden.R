@@ -80,6 +80,7 @@ gisDbase <- in_dir_grass
 
 #location <- 'DEM_LiDAR_1ft_2010_Improved_NYC_int'
 location <- 'NYC_example'
+location <- 'nyc_site'
 
 origin_fname <-  "OrigNYCSurface.tif"
 biosurf_fname <- "BioSurfaceFinal.tif"
@@ -116,6 +117,9 @@ initGRASS(gisBase = gisBase, #application location
           override = TRUE
 )
 
+#g.gisenv set="LOCATION_NAME=newlocation"
+
+
 ####  PART I: EXPLORE DATA READ AND DISPLAY INPUTS #######
 
 
@@ -142,7 +146,6 @@ plot(r_bio)
 
 tr1_origin <- transition(r_origin,transitionFunction = mean,directions=8)
 tr1_origin <- transition(r_test,transitionFunction = mean,directions=8)
-
 
 freq_origin_tb<- as.data.frame(freq(r_origin_garden))
 freq_new_node_tb<- as.data.frame(freq(r_new_node))
@@ -176,6 +179,18 @@ dim(new_nodes_sf)
 dim(freq_new_node_tb)
 View(new_nodes_sf)
 
+centroids_new_nodes_sf <- st_centroid(new_nodes_sf)
+centroids_orig_nodes_sf <- st_centroid(orig_nodes_sf)
+
+plot(r_bio)
+plot(centroids_orig_nodes_sf,col="blue",add=T,cex=0.5)
+plot(centroids_new_nodes_sf,col="red",add=T,cex=0.5)
+
+st_write(centroids_new_nodes_sf,"centroids_new_nodes.shp")
+st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp")
+
+#https://casoilresource.lawr.ucdavis.edu/software/grass-gis-raster-vector-and-imagery-analysis/raster-operations/simple-comparision-two-least-cost-path-approaches/
+
 #https://gis.stackexchange.com/questions/112304/how-to-create-least-cost-path-between-two-polygons-with-grass
 #https://stackoverflow.com/questions/9605827/least-cost-path-with-multiple-points
 #https://grasswiki.osgeo.org/wiki/Working_with_external_data_in_GRASS_7
@@ -201,18 +216,64 @@ View(new_nodes_sf)
 # use the result elsewhere
 #qgis $HOME/gisoutput/warm.tif
 
-r.in.gdal input=E:\cdnh43e_v1.1r1.tif output=cdnh43e_v1 location=LCC
-Now run:
+#v.in.ogr input=/home/user/shape_data/test_shape.shp output=grass_map 
 
-execGRASS("r.cost",)
+st_write(centroids_new_nodes_sf,"centroids_new_nodes.shp")
+st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp")
 
-g.region raster=cdnh43e_v1
+#exec("r.in.gdal" input=E:\cdnh43e_v1.1r1.tif output=cdnh43e_v1 location=LCC
 
-st_centroid()
-execGRASS("r.cost",)
+execGRASS("r.in.gdal",flags="o", input="BioSurfaceFinal.tif", output="biosurf")
 
-try(r_costexec <- execGRASS("r.stats", input = "fire_blocksgg", # no such file
-                     flags = c("C", "n")), silent=FALSE)
+projection(r_bio)==st_crs(centroids_new_nodes_sf)$proj4string
+#note projections not defined the same way so use flag -o to ignore
+execGRASS("v.in.ogr",flags="o", input="centroids_new_nodes.shp", output="centroids_new_nodes")
+          #,location="nyc_site")
+execGRASS("v.in.ogr",flags = "o", input="centroids_orig_nodes.shp", output="centroids_orig_nodes")
+#,location="nyc_site")
 
+
+#http://gracilis.carleton.ca/CUOSGwiki/index.php/Evaluating_Landscape_Permeability_in_Quantum)
+
+#execGRASS("d.rast" ,map="biosurf")
+
+execGRASS("r.cost", flags=c("k","overwrite"),input="biosurf", output="biosurf_cost",
+          outdir="biosurf_direction",
+          start_points="centroids_orig_nodes",stop_points="centroids_new_nodes" )
+
+#execGRASS("r.drain", input="biosurf_cost", 
+#          output="biosurf_drain",vector_points="centroids_new_nodes")
+
+r.mapcalc "friction = 1.0"
+
+execGRASS("r.walk", input="biosurf_cost", 
+          output="biosurf_drain",vector_points="centroids_new_nodes")
+
+
+# compute shortest path from start to end points
+r.drain in=walk.cost out=walk.drain vector_points=end
+r.drain in=cost out=cost.drain vector_points=end
+
+# compute cumulative cost surfaces
+#r.walk -k elev=elev friction=friction out=walk.cost start_points=start stop_points=end lambda=1
+
+#r.cost -k in=slope out=cost start_points=start stop_points=end
+
+# generate cost "friction" maps
+# unity friction for r.walk
+r.mapcalc "friction = 1.0"
+# use slope percent as the friction for r.cost
+r.slope.aspect elev=elev slope=slope format=percent
+
+# compute cumulative cost surfaces
+r.walk -k elev=elev friction=friction out=walk.cost start_points=start stop_points=end lambda=1
+
+# Peak cost value: 14030.894105
+r.cost -k in=slope out=cost start_points=start stop_points=end
+# Peak cost value: 11557.934493
+
+# compute shortest path from start to end points
+r.drain in=walk.cost out=walk.drain vector_points=end
+r.drain in=cost out=cost.drain vector_points=end
 
 ######################## End of Script ###########################
