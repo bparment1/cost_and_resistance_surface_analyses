@@ -43,7 +43,7 @@ library(plyr) #data wrangling: various operations for splitting, combining data
 library(readxl) #functionalities to read in excel type data
 library(gdistance) #package
 library(rgrass7)
-
+library(sf)
 
 ###### Functions used in this script
 
@@ -69,18 +69,18 @@ create_dir_fun <- function(outDir,out_suffix=NULL){
 in_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden"
 out_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/outputs"
 in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden" 
-in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/grass_data_urban_garden"
+#in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/grass_data_urban_garden"
 
 # background reading:
 # https://grass.osgeo.org/grass72/manuals/grass_database.html
 
 gisBase <- '/usr/lib/grass72'
 #gisDbase <- '/nfs/urbangi-data/grassdata'
-gisDbase <- in_dir_grass
+gisDbase <- in_dir_grass #should be the same as in_dir
 
 #location <- 'DEM_LiDAR_1ft_2010_Improved_NYC_int'
 location <- 'NYC_example'
-location <- 'nyc_site'
+location <- 'nyc_site2'
 
 origin_fname <-  "OrigNYCSurface.tif"
 biosurf_fname <- "BioSurfaceFinal.tif"
@@ -109,11 +109,12 @@ if(create_out_dir_param==TRUE){
 }
 
 
+mapset <- "nyc_site_test"
 # initialize a mapset for watershed estimation results
 initGRASS(gisBase = gisBase, #application location
           gisDbase = gisDbase,  #database dir
           location = location, #grass location
-          mapset = 'nyc_site', # grass mapset
+          mapset = mapset, # grass mapset
           override = TRUE
 )
 
@@ -128,24 +129,19 @@ r_bio <- raster(file.path(in_dir,biosurf_fname)) #<- "BioSurfaceFinal.tif"
 r_origin_garden <- raster(file.path(in_dir,origin_garden_node_fname)) #<- "OrigGardenNodes.tif"
 r_new_node <- raster(file.path(in_dir,new_node_fname)) # <- "NewNodes.tif"
 
-plot(r_origin_garden)
-
-origin_garden_node_fname<- "OrigGardenNodes.tif"
-
 ## 1) Check if we can use point for origin?
 
+#stack(r_origin,r_bio,r_origin_garden,r_new_node)
 
-stack(r_origin,r_bio,r_origin_garden,r_new_node)
-
-r_test <- r_bio + 28
+#r_test <- r_bio + 28
 r_origin
-NAvalue(r_origin) <- 0
+#NAvalue(r_origin) <- 0
 
-plot(r_origin)
-plot(r_bio)
+#plot(r_origin)
+#plot(r_bio)
 
 tr1_origin <- transition(r_origin,transitionFunction = mean,directions=8)
-tr1_origin <- transition(r_test,transitionFunction = mean,directions=8)
+#tr1_origin <- transition(r_test,transitionFunction = mean,directions=8)
 
 freq_origin_tb<- as.data.frame(freq(r_origin_garden))
 freq_new_node_tb<- as.data.frame(freq(r_new_node))
@@ -178,16 +174,29 @@ dim(new_nodes_sf)
 #View(new_node_fname)
 dim(freq_new_node_tb)
 View(new_nodes_sf)
+centroids_new_nodes_sf
+centroids_orig_nodes_sf
 
 centroids_new_nodes_sf <- st_centroid(new_nodes_sf)
 centroids_orig_nodes_sf <- st_centroid(orig_nodes_sf)
+plot(centroids_orig_nodes_sf)
+dim(centroids_orig_nodes_sf)
+
+##Figure 1: wwf ecoregion
+res_pix<-960
+col_mfrow<-1
+row_mfrow<-1
+png(filename=paste("Figure_NYC_site_nodes",out_suffix,".png",sep=""),
+    width=col_mfrow*res_pix,height=row_mfrow*res_pix)
 
 plot(r_bio)
 plot(centroids_orig_nodes_sf,col="blue",add=T,cex=0.5)
 plot(centroids_new_nodes_sf,col="red",add=T,cex=0.5)
 
-st_write(centroids_new_nodes_sf,"centroids_new_nodes.shp")
-st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp")
+dev.off()
+
+st_write(centroids_new_nodes_sf,"centroids_new_nodes.shp",delete_dsn = T) #overwrite using delete_dsn
+st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp",delete_dsn = T)
 
 #https://casoilresource.lawr.ucdavis.edu/software/grass-gis-raster-vector-and-imagery-analysis/raster-operations/simple-comparision-two-least-cost-path-approaches/
 
@@ -218,33 +227,62 @@ st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp")
 
 #v.in.ogr input=/home/user/shape_data/test_shape.shp output=grass_map 
 
-st_write(centroids_new_nodes_sf,"centroids_new_nodes.shp")
-st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp")
 
 #exec("r.in.gdal" input=E:\cdnh43e_v1.1r1.tif output=cdnh43e_v1 location=LCC
 
-execGRASS("r.in.gdal",flags="o", input="BioSurfaceFinal.tif", output="biosurf")
+execGRASS("r.in.gdal",flags="o", input=biosurf_fname, output="biosurf")
+execGRASS("r.in.gdal",flags="o", input=origin_fname, output="biosurf")
 
 projection(r_bio)==st_crs(centroids_new_nodes_sf)$proj4string
 #note projections not defined the same way so use flag -o to ignore
-execGRASS("v.in.ogr",flags="o", input="centroids_new_nodes.shp", output="centroids_new_nodes")
+execGRASS("v.in.ogr",flags=c("o","overwrite"), input="centroids_new_nodes.shp", output="centroids_new_nodes")
           #,location="nyc_site")
-execGRASS("v.in.ogr",flags = "o", input="centroids_orig_nodes.shp", output="centroids_orig_nodes")
+execGRASS("v.in.ogr",flags = c("o","overwrite"), 
+          input="centroids_orig_nodes.shp", output="centroids_orig_nodes")
 #,location="nyc_site")
-
 
 #http://gracilis.carleton.ca/CUOSGwiki/index.php/Evaluating_Landscape_Permeability_in_Quantum)
 
 #execGRASS("d.rast" ,map="biosurf")
 
+r.cost_param <- list(
+                     input="biosurf", 
+                     output="biosurf_cost",
+                     outdir="biosurf_direction",
+                     start_points="centroids_orig_nodes",
+                     stop_points="centroids_new_nodes"
+)
+
+execGRASS('r.cost',flags=c("k","overwrite"), parameters = r.cost_param)
+
 execGRASS("r.cost", flags=c("k","overwrite"),input="biosurf", output="biosurf_cost",
           outdir="biosurf_direction",
-          start_points="centroids_orig_nodes",stop_points="centroids_new_nodes" )
+          start_points="centroids_orig_nodes",
+          stop_points="centroids_new_nodes" )
 
-#execGRASS("r.drain", input="biosurf_cost", 
+execGRASS("r.cost", flags=c("k","overwrite"),input="biosurf", output="biosurf_cost",
+          outdir="biosurf_direction",
+          start_points="centroids_orig_nodes@nyc_site_test",
+          stop_points="centroids_new_nodes@nyc_site_test" )
+
+#### describe columns of vector database
+system("db.describe table=centroids_orig_nodes")
+#db.describe -c table=vect_map
+system("db.describe -c table=centroids_orig_nodes") # just name of columns
+
+system("v.info centroids_orig_nodes")
+system("r.info biosurf")
+system("v.to.rast input=centroids_orig_nodes output=centroids_orig_nodes_surf attribute_column=DN")
+
+
+#"centroids_new_nodes.shp"
+ #execGRASS("r.drain", input="biosurf_cost", 
 #          output="biosurf_drain",vector_points="centroids_new_nodes")
 
-r.mapcalc "friction = 1.0"
+## 
+execGRASS("r.mapcalc", "test = 'biosurf == 1'")
+system("r.mapcalc 'biosurf == 1'")
+#r.mapcalc "friction = 1.0"
 
 execGRASS("r.walk", input="biosurf_cost", 
           output="biosurf_drain",vector_points="centroids_new_nodes")
