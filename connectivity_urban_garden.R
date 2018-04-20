@@ -2,12 +2,10 @@
 #########################################   Urban garden Pursuit   #######################################
 # This script explores shortest path with real data from the Urban garden pursuit group.
 #
-#Goal: Determine the ten (10) parcels of land within Clay County in the focus zone most suitable for purchase
-#towards conversion to land conservation.
 #
 #AUTHORS: Benoit Parmentier                                             
 #DATE CREATED: 04/16/2018 
-#DATE MODIFIED: 04/16/2018
+#DATE MODIFIED: 04/20/2018
 #Version: 2
 #PROJECT: SESYNC and AAG 2018 workshop/Short Course preparation
 #TO DO:
@@ -272,8 +270,23 @@ system("db.describe -c table=centroids_orig_nodes") # just name of columns
 
 system("v.info centroids_orig_nodes")
 system("r.info biosurf")
-system("v.to.rast input=centroids_orig_nodes output=centroids_orig_nodes_surf attribute_column=DN")
 
+#### Set region extent and resolution first
+system("g.region -p") #Exaine current region properties
+
+system("g.region rast=biosurf")
+system("g.region -p")
+#system("v.to.rast input=centroids_orig_nodes output=centroids_orig_nodes_surf attribute_column=DN")
+system("v.to.rast --overwrite input=centroids_orig_nodes use=attr output=centroids_orig_nodes_surf attribute_column=DN")
+system("r.info centroids_orig_nodes_surf")
+
+#"rast=name[,name,...]
+#Set region to match this raster map")
+#centroids_orig_nodes_surf
+
+execGRASS("r.cost", flags=c("k","overwrite"),input="biosurf", output="biosurf_cost",
+          outdir="biosurf_direction",
+          start_raster="centroids_orig_nodes_surf")
 
 #"centroids_new_nodes.shp"
  #execGRASS("r.drain", input="biosurf_cost", 
