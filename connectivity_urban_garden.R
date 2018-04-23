@@ -5,12 +5,12 @@
 #
 #AUTHORS: Benoit Parmentier                                             
 #DATE CREATED: 04/16/2018 
-#DATE MODIFIED: 04/20/2018
+#DATE MODIFIED: 04/23/2018
 #Version: 2
 #PROJECT: SESYNC and AAG 2018 workshop/Short Course preparation
 #TO DO:
 #
-#COMMIT: testing code for urban garden
+#COMMIT: resizing image for test and subsetting nodes
 #
 #################################################################################################
 
@@ -87,7 +87,7 @@ new_node_fname <- "NewNodes.tif"
 
 file_format <- ".tif" #PARAM5
 NA_flag_val <- -9999 #PARAM7
-out_suffix <-"ny_example_04162018" #output suffix for the files and ouptu folder #PARAM 8
+out_suffix <-"ny_example_04232018" #output suffix for the files and ouptu folder #PARAM 8
 create_out_dir_param=TRUE #PARAM9
 
 ################# START SCRIPT ###############################
@@ -129,17 +129,17 @@ r_new_node <- raster(file.path(in_dir,new_node_fname)) # <- "NewNodes.tif"
 
 ## 1) Check if we can use point for origin?
 
-#stack(r_origin,r_bio,r_origin_garden,r_new_node)
-
-#r_test <- r_bio + 28
 r_origin
-#NAvalue(r_origin) <- 0
-
-#plot(r_origin)
-#plot(r_bio)
-
 tr1_origin <- transition(r_origin,transitionFunction = mean,directions=8)
-#tr1_origin <- transition(r_test,transitionFunction = mean,directions=8)
+
+#This generates the following error:
+
+#> tr1_origin <- transition(r_origin,transitionFunction = mean,directions=8)
+#Error in validObject(.Object) : 
+#  invalid class “dsCMatrix” object: Negative value in Dim
+#In addition: Warning message:
+#  In .nextMethod(.Object = .Object, ... = ...) :
+#  NAs introduced by coercion to integer range
 
 freq_origin_tb<- as.data.frame(freq(r_origin_garden))
 freq_new_node_tb<- as.data.frame(freq(r_new_node))
@@ -149,6 +149,7 @@ freq_new_node_tb<- as.data.frame(freq(r_new_node))
 write.table(freq_origin_tb,"freq_origin_tb.txt",sep=",")
 write.table(freq_new_node_tb,"new_node_tb.txt",sep=",")
 
+##### Convert Nodes to polygons? This is a very quick option using gdal_polygonize.py
 setwd(in_dir)
 #cmd_str <- "gdal_polygonize.py input.asc -f 'GeoJSON' output.json"
 cmd_str <- "gdal_polygonize.py OrigGardenNodes.tif -f 'ESRI SHapefile' OrigGardenNodes.shp"
@@ -158,29 +159,28 @@ system(cmd_str)
 orig_nodes_sf <- st_read("OrigGardenNodes.shp")
 
 plot(orig_nodes_sf)
+dim(orig_nodes_sf)
+table(orig_nodes_sf$DN)
 #View(orig_nodes_sf)
 
 new_node_fname <- "NewNodes.tif"
-
 cmd_str <- "gdal_polygonize.py NewNodes.tif -f 'ESRI SHapefile' NewNodes.shp"
-
 system(cmd_str)
 
 new_nodes_sf <- st_read("NewNodes.shp")
-plot(new_nodes_sf)
+plot(new_nodes_sf,border="red",add=T)
 dim(new_nodes_sf)
 #View(new_node_fname)
 dim(freq_new_node_tb)
 View(new_nodes_sf)
-centroids_new_nodes_sf
-centroids_orig_nodes_sf
+table(new_nodes_sf$DN)
 
 centroids_new_nodes_sf <- st_centroid(new_nodes_sf)
 centroids_orig_nodes_sf <- st_centroid(orig_nodes_sf)
 plot(centroids_orig_nodes_sf)
 dim(centroids_orig_nodes_sf)
 
-##Figure 1: wwf ecoregion
+##Figure nodes and suitability surface
 res_pix<-960
 col_mfrow<-1
 row_mfrow<-1
@@ -195,6 +195,10 @@ dev.off()
 
 st_write(centroids_new_nodes_sf,"centroids_new_nodes.shp",delete_dsn = T) #overwrite using delete_dsn
 st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp",delete_dsn = T)
+
+
+#### Let's aggregate?
+
 
 #https://casoilresource.lawr.ucdavis.edu/software/grass-gis-raster-vector-and-imagery-analysis/raster-operations/simple-comparision-two-least-cost-path-approaches/
 
@@ -228,8 +232,8 @@ st_write(centroids_orig_nodes_sf,"centroids_orig_nodes.shp",delete_dsn = T)
 
 #exec("r.in.gdal" input=E:\cdnh43e_v1.1r1.tif output=cdnh43e_v1 location=LCC
 
-execGRASS("r.in.gdal",flags="o", input=biosurf_fname, output="biosurf")
-execGRASS("r.in.gdal",flags="o", input=origin_fname, output="biosurf")
+execGRASS("r.in.gdal",flags=c("o","overwrite"), input=biosurf_fname, output="biosurf")
+#execGRASS("r.in.gdal",flags=c("o","overwrite"), input=origin_fname, output="biosurf")
 
 projection(r_bio)==st_crs(centroids_new_nodes_sf)$proj4string
 #note projections not defined the same way so use flag -o to ignore
@@ -242,6 +246,8 @@ execGRASS("v.in.ogr",flags = c("o","overwrite"),
 #http://gracilis.carleton.ca/CUOSGwiki/index.php/Evaluating_Landscape_Permeability_in_Quantum)
 
 #execGRASS("d.rast" ,map="biosurf")
+
+
 
 r.cost_param <- list(
                      input="biosurf", 
