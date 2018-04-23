@@ -2,7 +2,7 @@
 ## Importing and processing data from survey for the fisheries project at SESYNC.
 ## 
 ## DATE CREATED: 06/06/2017
-## DATE MODIFIED: 10/12/2017
+## DATE MODIFIED: 04/24/2018
 ## AUTHORS: Benoit Parmentier 
 ## PROJECT: Garden Wealth (urban garden)
 ## ISSUE: 
@@ -77,7 +77,7 @@ out_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/outputs" #p
 num_cores <- 2 #param 8
 create_out_dir_param=TRUE # param 9
 
-out_suffix <-"connectivity_example_10122017" #output suffix for the files and ouptut folder #param 12
+out_suffix <- "connectivity_example_04242018" #output suffix for the files and ouptut folder #param 12
 
 ############## START SCRIPT ############################
 
@@ -196,7 +196,6 @@ rDiv <- max(max(r1, r2) * (1 - min(r1, r2)) - min(r1, r2), 0)
 r <- raster(system.file("external/maungawhau.grd", package="gdistance"))
 plot(r)
 
-
 #The Hiking Function requires the slope (m) as input, which can be calculated from the altitude
 #(z) and distance between cell centres (d).
 #mij = (zj − zi)/dij
@@ -216,6 +215,8 @@ speed[adj] <- 6 * exp(-3.5 * abs(slope[adj] + 0.05)) #Tobbler Hiking function
 Conductance <- geoCorrection(speed)
 
 plot(raster(Conductance))
+
+##### Generate Nodes:
 
 A <- c(2667670, 6479000)
 B <- c(2667800, 6479400)
@@ -291,6 +292,74 @@ plot(AtoB,col="black",add=T)
 plot(BtoA,col="red",add=T)
 
 ### Generate example with Oregon data?
+
+###################### PART 2: compare with GRASS for random walk ###########
+
+#### Hiking example
+
+r <- raster(system.file("external/maungawhau.grd", package="gdistance"))
+plot(r)
+
+#The Hiking Function requires the slope (m) as input, which can be calculated from the altitude
+#(z) and distance between cell centres (d).
+#mij = (zj − zi)/dij
+#The units of altitude and distance should be identical. Here, we use meters for both. First, we
+#calculate the altitudinal differences between cells. Then we use the geoCorrection function
+#to divide by the distance between cells.
+
+altDiff <- function(x){x[2] - x[1]}
+hd <- transition(r, altDiff, 8, symm=FALSE)
+slope <- geoCorrection(hd)
+
+plot(raster(slope))
+
+adj <- adjacent(r, cells=1:ncell(r), pairs=TRUE, directions=8) 
+speed <- slope
+speed[adj] <- 6 * exp(-3.5 * abs(slope[adj] + 0.05)) #Tobbler Hiking function
+Conductance <- geoCorrection(speed)
+
+plot(raster(Conductance))
+
+##### Generate Nodes:
+
+### Add a point
+A <- c(2667670, 6479000)
+B <- c(2667800, 6479400)
+C <- c(2667899,6478800)
+
+net2_sp <- SpatialPoints(rbind(A,B,C))
+plot(r, xlab="x coordinate (m)", ylab="y coordinate (m)",legend.lab="Altitude (masl)")
+plot(net2_sp,add=T)
+test <- shortestPath(Conductance, net2_sp, net2_sp, output="SpatialLines")
+class(test)
+
+plot(r)
+plot(test,add=T)
+
+dist_test <- distance(r,net2_sp)
+dist_test <- distanceFromPoints(r,net2_sp)
+
+##### Shortest path
+AtoB <- shortestPath(Conductance, A, B, output="SpatialLines")
+BtoA <- shortestPath(Conductance, B, A, output="SpatialLines")
+#Add new path/route
+BtoC <- shortestPath(Conductance, B, C, output="SpatialLines")
+CtoB <- shortestPath(Conductance, B, C, output="SpatialLines")
+#Add new path/route
+AtoC <- shortestPath(Conductance, A, C, output="SpatialLines")
+CtoA <- shortestPath(Conductance, C, A, output="SpatialLines")
+
+##### Random walk: commute distance
+
+altDiff <- function(x){x[2] - x[1]}
+hd <- transition(r, altDiff, 8, symm=FALSE)
+#Create a Transition object from the raster
+tr <- transition(r,function(x) 1/mean(x),8)
+
+test_path <- commuteDistance(tr,net2_sp) 
+
+
+
 
 
 ###################### END OF SCRIPT ################
