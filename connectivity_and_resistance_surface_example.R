@@ -39,6 +39,7 @@ library(rowr)                                # Contains cbind.fill
 library(car)
 library(sf)
 library(gdistance)
+library(rgrass7)
 
 ###### Functions used in this script and sourced from other files
 
@@ -71,13 +72,28 @@ load_obj <- function(f){
 ############################################################################
 #####  Parameters and argument set up ###########
 
-in_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data" #local bpy50 , param 1
-out_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/outputs" #param 2
-
-num_cores <- 2 #param 8
-create_out_dir_param=TRUE # param 9
-
 out_suffix <- "connectivity_example_04242018" #output suffix for the files and ouptut folder #param 12
+
+in_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden"
+out_dir <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/outputs"
+in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden" 
+#in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/grass_data_urban_garden"
+
+# background reading:
+# https://grass.osgeo.org/grass72/manuals/grass_database.html
+
+gisBase <- '/usr/lib/grass72'
+#gisDbase <- '/nfs/urbangi-data/grassdata'
+gisDbase <- in_dir_grass #should be the same as in_dir
+
+#location <- 'DEM_LiDAR_1ft_2010_Improved_NYC_int'
+location <- 'NYC_example'
+location <- 'connectivy_example'
+
+file_format <- ".tif" #PARAM5
+NA_flag_val <- -9999 #PARAM7
+out_suffix <-"ny_example_04232018" #output suffix for the files and ouptu folder #PARAM 8
+create_out_dir_param=TRUE #PARAM9
 
 ############## START SCRIPT ############################
 
@@ -96,6 +112,15 @@ if(create_out_dir_param==TRUE){
 }else{
   setwd(out_dir) #use previoulsy defined directory
 }
+
+mapset <- "nyc_site_test"
+# initialize a mapset for watershed estimation results
+initGRASS(gisBase = gisBase, #application location
+          gisDbase = gisDbase,  #database dir
+          location = location, #grass location
+          mapset = mapset, # grass mapset
+          override = TRUE
+)
 
 ### PART I READ AND PREPARE DATA #######
 #set up the working directory
@@ -195,6 +220,7 @@ rDiv <- max(max(r1, r2) * (1 - min(r1, r2)) - min(r1, r2), 0)
 
 r <- raster(system.file("external/maungawhau.grd", package="gdistance"))
 plot(r)
+r
 
 #The Hiking Function requires the slope (m) as input, which can be calculated from the altitude
 #(z) and distance between cell centres (d).
@@ -358,7 +384,7 @@ tr <- transition(r,function(x) 1/mean(x),8)
 
 test_path <- commuteDistance(tr,net2_sp) 
 
-
+#### Add GRASS code here:
 
 
 
