@@ -193,8 +193,10 @@ test_path <- commuteDistance(tr,net2_sp)
 plot(net2_sp)
 net2_sf <- as(net2_sp,"sf")
 plot(net2_sf$geometry)
-View(net2_sf)
-st_write(net2_sf,"network_nodes.shp")
+#View(net2_sf)
+net2_sf$ID <- 1:nrow(net2_sf)
+
+st_write(net2_sf,"network_nodes.shp",delete_layer = T)
 writeRaster(r,"r_surf.tif")
 
 #### Add GRASS code here:
@@ -203,41 +205,42 @@ execGRASS("v.in.ogr",flags = c("o","overwrite"),
           input="network_nodes.shp", 
           output="nodes_origin")
 
-execGRASS("r.in.gdal",flags=c("o","overwrite"), input="r_surf.tif", output="r_surf")
-#execGRASS("r.in.gdal",flags=c("o","overwrite"), input=origin_fname, output="biosurf")
+execGRASS("r.in.gdal",flags=c("o","overwrite"), 
+          input="r_surf.tif", 
+          output="r_surf")
 system("r.info r_surf")
-r
+r #check we have the same res, etc.
+
 #### Set region extent and resolution first
 system("g.region -p") #Exaine current region properties
+#system("g.region -p") #Exaine current region properties
 
 system("g.region rast=r_surf")
 system("g.region -p")
 
-system("v.to.rast --overwrite input=nodes_origin use=attr output=nodes_origin_surf attribute_column=DN")
-system("r.info centroids_orig_nodes_surf")
+system("v.to.rast --overwrite input=nodes_origin use=attr output=nodes_origin_surf attribute_column=ID")
+system("r.info nodes_origin_surf")
 
-execGRASS("r.randomwalk",flags=c("o","overwrite"), 
-          elevation="r_surf", 
-          output="r_surf")
+system("r.mapcalc 'r_friction = 1'") #creates a raster with value 1
+system("r.info r_friction")
 
-
-r.randomwalk help
-r.randomwalk [-abkmnpqsvx] prefix=string [cores=integer] [cellsize=float]
-[aoicoords=float,...][aoimap=name] elevation=name [releasefile=string] 
-[caserules=integer,integer,...] [releasemap=name] [depositmap=name]
-[impactmap=name] [probmap=name] [scoremap=name] [impactobjects=name] 
-[objectscores=string] models=string mparams=string [sampling=integer]
-[retain=float] [functype=integer] [backfile=string] [cdffile=string]
-[zonalfile=string] [profile=float,...] [--verbose] [--quiet]
+# compute cumulative cost surfaces
+system("r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1")
 
 
-projection(r_bio)==st_crs(centroids_new_nodes_sf)$proj4string
-#note projections not defined the same way so use flag -o to ignore
-execGRASS("v.in.ogr",flags=c("o","overwrite"), input="centroids_new_nodes.shp", output="centroids_new_nodes")
-#,location="nyc_site")
-execGRASS("v.in.ogr",flags = c("o","overwrite"), 
-          input="centroids_orig_nodes.shp", output="centroids_orig_nodes")
-#,location="nyc_site")
+#execGRASS("r.randomwalk",flags=c("o","overwrite"), 
+#          elevation="r_surf", 
+#          releasemp="nodes_origin_surf",
+#          output="r_surf")
 
+
+#r.randomwalk help
+#r.randomwalk [-abkmnpqsvx] prefix=string [cores=integer] [cellsize=float]
+#[aoicoords=float,...][aoimap=name] elevation=name [releasefile=string] 
+#[caserules=integer,integer,...] [releasemap=name] [depositmap=name]
+#[impactmap=name] [probmap=name] [scoremap=name] [impactobjects=name] 
+#[objectscores=string] models=string mparams=string [sampling=integer]
+#[retain=float] [functype=integer] [backfile=string] [cdffile=string]
+#[zonalfile=string] [profile=float,...] [--verbose] [--quiet]
 
 ###################### END OF SCRIPT ################
