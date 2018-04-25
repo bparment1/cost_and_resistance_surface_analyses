@@ -126,199 +126,6 @@ initGRASS(gisBase = gisBase, #application location
 #set up the working directory
 #Create output directory
 
-lf_dir <- list.files(in_dir,full.names=T) #this is the list of folder with RAW data information
-
-set.seed(123)
-r <- raster(ncol=3,nrow=3)
-r[] <- 1:ncell(r)
-r
-plot(r)
-
-r[] <- 1
-tr1 <- transition(r,transitionFunction = mean,directions=8)
-
-tr1
-plot(tr1)
-
-r2 <- r
-r2[] <- runif(9)
-ncf <- function(x){max(x) - x[1] + x[2]}
-tr2 <- transition(r2,ncf,4,symm=FALSE)
-
-transitionMatrix(tr2)
-tr2
-image(transitionMatrix(tr2))
-
-tr1 # with dsCMatrix object (symmetric)
-tr2 # with dgCMatrix object (asymmetric)
-
-tr3 <- tr1*tr2
-tr3 <- tr1+tr2
-tr3 <- tr1*3
-tr3 <- sqrt(tr1)
-
-image(transitionMatrix(tr3))
-
-plot(raster(tr3), main="raster(tr3)", xlab="Longitude (degrees)",
-     ylab="Latitude (degrees)")
-
-#This paper describe the links between conductance, friction etc.
-#https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2920323/
-
-tr1C <- geoCorrection(tr1, type="c")
-tr2C <- geoCorrection(tr2, type="c")
-
-### Cost distance and least cost path
-r3 <- raster(ncol=18,nrow=9)
-r3 <- setValues(r3,runif(18*9)+5)
-plot(r3)
-
-tr3 <- transition(r3, mean, 4)
-tr3C <- geoCorrection(tr3, type="c", multpl=FALSE, scl=TRUE)
-tr3R <- geoCorrection(tr3, type="r", multpl=FALSE, scl=TRUE)
-
-CorrMatrix <- geoCorrection(tr3, type="r", multpl=TRUE, scl=TRUE)
-tr3R <- tr3 * CorrMatrix
-
-plot(raster(tr3R))
-plot(raster(tr3C))
-plot(raster(tr3))
-
-###### Let's make a mock example:
-
-sP <- cbind(c(-100,-100,100),c(50,-50,50))
-
-points <- SpatialPoints(sP)
-  
-plot(raster(tr3C))
-plot(points,add=T)
-text(points,c(1,2,3))
-
-costDistance(tr3C, sP)
-commuteDistance(tr3R, sP)
-
-rSPDistance(tr3R, sP, sP, theta=1e-12, totalNet="total")
-
-##### PASSAGE
-
-origin <- SpatialPoints(cbind(0, 0))
-rSPraster <- passage(tr3C, origin, sP[1,], theta=3)
-
-rSPraster
-plot(rSPraster)
-text(points[1,],"sP1")
-text(origin,"O")
-
-### Non overlapping trajectories
-
-r1 <- passage(tr3C, origin, sP[1,], theta=1)
-r2 <- passage(tr3C, origin, sP[2,], theta=1)
-rJoint <- min(r1, r2)
-rDiv <- max(max(r1, r2) * (1 - min(r1, r2)) - min(r1, r2), 0)
-
-#### Hiking example
-
-r <- raster(system.file("external/maungawhau.grd", package="gdistance"))
-plot(r)
-r
-
-#The Hiking Function requires the slope (m) as input, which can be calculated from the altitude
-#(z) and distance between cell centres (d).
-#mij = (zj − zi)/dij
-#The units of altitude and distance should be identical. Here, we use meters for both. First, we
-#calculate the altitudinal differences between cells. Then we use the geoCorrection function
-#to divide by the distance between cells.
-
-altDiff <- function(x){x[2] - x[1]}
-hd <- transition(r, altDiff, 8, symm=FALSE)
-slope <- geoCorrection(hd)
-
-plot(raster(slope))
-
-adj <- adjacent(r, cells=1:ncell(r), pairs=TRUE, directions=8) 
-speed <- slope
-speed[adj] <- 6 * exp(-3.5 * abs(slope[adj] + 0.05)) #Tobbler Hiking function
-Conductance <- geoCorrection(speed)
-
-plot(raster(Conductance))
-
-##### Generate Nodes:
-
-A <- c(2667670, 6479000)
-B <- c(2667800, 6479400)
-AtoB <- shortestPath(Conductance, A, B, output="SpatialLines")
-BtoA <- shortestPath(Conductance, B, A, output="SpatialLines")
-
-plot(r, xlab="x coordinate (m)", ylab="y coordinate (m)",legend.lab="Altitude (masl)")
-lines(AtoB, col="red", lwd=2)
-lines(BtoA, col="blue")
-text(A[1] - 10, A[2] - 10, "A")
-text(B[1] + 10, B[2] + 10, "B")
-
-class(rbind(A,B))
-net_sp <- SpatialPoints(rbind(A,B))
-plot(net_sp,add=T)
-commuteDistance(Conductance,net_sp) 
-#> commuteDistance(Conductance,net_sp)
-#Error in .rD(x, coords) : 
-#  symmetric transition matrix required (dsCMatrix) in TransitionLayer object x
-
-### Add a point
-
-C <- c(2667899,6478800)
-net2_sp <- SpatialPoints(rbind(A,B,C))
-plot(r, xlab="x coordinate (m)", ylab="y coordinate (m)",legend.lab="Altitude (masl)")
-plot(net2_sp,add=T)
-test <- shortestPath(Conductance, net2_sp, net2_sp, output="SpatialLines")
-
-dist_test <- distance(r,net2_sp)
-dist_test <- distanceFromPoints(r,net2_sp)
-
-AtoB <- shortestPath(Conductance, A, B, output="SpatialLines")
-BtoA <- shortestPath(Conductance, B, A, output="SpatialLines")
-#Add new path/route
-BtoC <- shortestPath(Conductance, B, C, output="SpatialLines")
-CtoB <- shortestPath(Conductance, B, C, output="SpatialLines")
-#Add new path/route
-AtoC <- shortestPath(Conductance, A, C, output="SpatialLines")
-CtoA <- shortestPath(Conductance, C, A, output="SpatialLines")
-
-plot(r, xlab="x coordinate (m)", ylab="y coordinate (m)",legend.lab="Altitude (masl)")
-lines(AtoB, col="red", lwd=2)
-lines(BtoA, col="blue")
-text(A[1] - 10, A[2] - 10, "A")
-text(B[1] + 10, B[2] + 10, "B")
-plot(CtoB,col="red",add=T)
-plot(BtoC,col="black",add=T)
-text(C[1] -10, C[2] - 10, "C")
-plot(AtoC,col="black",add=T)
-plot(CtoA,col="red",add=T)
-
-pt_test <- st_point(1:2)
-
-r_passage_AB <- passage(Conductance, A, B, theta=10)#not sensible
-plot(r_passage_AB)
-r_passage_AB <- passage(Conductance, A, B, theta=3) #it constraints the path
-
-theta_val <- c(0.1,2,3)
-list_r_passage_AB <- lapply(1:length(theta_val),function(x){passage(x=Conductance,
-                                                                    origin=A,
-                                                                    goal=B,
-                                                                    theta=x)})
-r_passages_stack <- stack(list_r_passage_AB)
-names(r_passages_stack) <- theta_val
-plot(r_passages_stack)
-
-### Now full figure:
-
-plot(r_passage_AB)
-text(A[1] - 10, A[2] - 10, "A")
-text(B[1] + 10, B[2] + 10, "B")
-plot(AtoB,col="black",add=T)
-plot(BtoA,col="red",add=T)
-
-### Generate example with Oregon data?
-
 ###################### PART 2: compare with GRASS for random walk ###########
 
 #### Hiking example
@@ -383,9 +190,54 @@ hd <- transition(r, altDiff, 8, symm=FALSE)
 tr <- transition(r,function(x) 1/mean(x),8)
 
 test_path <- commuteDistance(tr,net2_sp) 
+plot(net2_sp)
+net2_sf <- as(net2_sp,"sf")
+plot(net2_sf$geometry)
+View(net2_sf)
+st_write(net2_sf,"network_nodes.shp")
+writeRaster(r,"r_surf.tif")
 
 #### Add GRASS code here:
 
+execGRASS("v.in.ogr",flags = c("o","overwrite"), 
+          input="network_nodes.shp", 
+          output="nodes_origin")
+
+execGRASS("r.in.gdal",flags=c("o","overwrite"), input="r_surf.tif", output="r_surf")
+#execGRASS("r.in.gdal",flags=c("o","overwrite"), input=origin_fname, output="biosurf")
+system("r.info r_surf")
+r
+#### Set region extent and resolution first
+system("g.region -p") #Exaine current region properties
+
+system("g.region rast=r_surf")
+system("g.region -p")
+
+system("v.to.rast --overwrite input=nodes_origin use=attr output=nodes_origin_surf attribute_column=DN")
+system("r.info centroids_orig_nodes_surf")
+
+execGRASS("r.randomwalk",flags=c("o","overwrite"), 
+          elevation="r_surf", 
+          output="r_surf")
+
+
+r.randomwalk help
+r.randomwalk [-abkmnpqsvx] prefix=string [cores=integer] [cellsize=float]
+[aoicoords=float,...][aoimap=name] elevation=name [releasefile=string] 
+[caserules=integer,integer,...] [releasemap=name] [depositmap=name]
+[impactmap=name] [probmap=name] [scoremap=name] [impactobjects=name] 
+[objectscores=string] models=string mparams=string [sampling=integer]
+[retain=float] [functype=integer] [backfile=string] [cdffile=string]
+[zonalfile=string] [profile=float,...] [--verbose] [--quiet]
+
+
+projection(r_bio)==st_crs(centroids_new_nodes_sf)$proj4string
+#note projections not defined the same way so use flag -o to ignore
+execGRASS("v.in.ogr",flags=c("o","overwrite"), input="centroids_new_nodes.shp", output="centroids_new_nodes")
+#,location="nyc_site")
+execGRASS("v.in.ogr",flags = c("o","overwrite"), 
+          input="centroids_orig_nodes.shp", output="centroids_orig_nodes")
+#,location="nyc_site")
 
 
 ###################### END OF SCRIPT ################
