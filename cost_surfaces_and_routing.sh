@@ -24,18 +24,17 @@ gisDbase <- in_dir_grass #should be the same as in_dir
 location <- 'NYC_example'
 location <- 'connectivy_example'
 
-#grass75 -text ~/grassdata/mylocation/mymapset
+grass -text ~/grassdata/mylocation/mymapset
 
 #### Start here:
 ## Type this to start grass from permanent
-#grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/PERMANENT
+grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/PERMANENT
 grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/nyc_site_test
 
 #### Add GRASS code here:
 
 v.in.ogr" -f "o" input="network_nodes.shp" output="nodes_origin"
-r.in.gdal -o --overwrite input=r_surf.tif output=r_surf
-          
+
 execGRASS("r.in.gdal",flags=c("o","overwrite"), 
           input="r_surf.tif", 
           output="r_surf")
@@ -54,12 +53,6 @@ system("r.info nodes_origin_surf")
 
 system("r.mapcalc 'r_friction = 1'") #creates a raster with value 1
 system("r.info r_friction")
-d.rast r_surf
-
-
-i.group group=r_surf_group input=r_surf
-i.segment group=r_surf_group output=test_segments threshold=0.05 
-
 
 # compute cumulative cost surfaces
 system("r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1")
