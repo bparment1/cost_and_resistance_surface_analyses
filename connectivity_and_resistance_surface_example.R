@@ -196,6 +196,9 @@ plot(net2_sf$geometry)
 #View(net2_sf)
 net2_sf$ID <- 1:nrow(net2_sf)
 
+node_1_sf <- subset(net2_sf,ID==1)
+plot(node_1_sf$geometry,add=T)
+
 st_write(net2_sf,"network_nodes.shp",delete_layer = T)
 writeRaster(r,"r_surf.tif")
 
@@ -226,7 +229,33 @@ system("r.info r_friction")
 
 # compute cumulative cost surfaces
 system("r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1")
+#system("r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1")
 
+execGRASS("r.cost", flags=c("k","overwrite"),
+          input="r_surf", 
+          output="r_surf_cost",
+          outdir="r_surf_direction",
+          start_raster="nodes_origin_surf")
+
+# compute shortest path from start to end points
+#execGRASS()
+#system("r.drain in=walk.cost out=walk.drain vector_points=end")
+system("r.drain input=walk.cost output=walk.drain vector_points=nodes_origin")
+system("r.drain input=r_surf_cost output=cost_drain vector_points=nodes_origin")
+
+system("r.out.gdal input=walk.drain output=path_r_walk.tif") 
+system("r.out.gdal input=walk.cost output=walk_cost.tif") 
+system("r.out.gdal input=cost_drain output=cost_drain.tif") 
+
+r_path_walk <- raster("path_r_walk.tif")
+r_walk_cost <- raster("walk_cost.tif")
+r_cost_drain <- raster("cost_drain.tif")
+
+plot(r_path_walk)
+plot(r_walk_cost)
+plot(r_cost_drain)
+
+#### Test random walk
 
 #execGRASS("r.randomwalk",flags=c("o","overwrite"), 
 #          elevation="r_surf", 
