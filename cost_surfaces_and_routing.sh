@@ -8,6 +8,15 @@ GISDBASE = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_g
 LOCATION_NAME = connectivy_example
 MAPSET = PERMANENT
 
+GISDBASE = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden
+#LOCATION = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/
+LOCATION_NAME = connectivy_example
+MAPSET = nyc_site_test
+
+LOCATION_NAME=connectivy_example
+GISDBASE=/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden
+MAPSET=nyc_site_test
+
 LOCATION = /usr/local/share/grassdata/spearfish70/PERMANENT
 GISDBASE = /usr/local/share/grassdata
 LOCATION_NAME = spearfish70
@@ -30,54 +39,46 @@ location <- 'connectivy_example'
 ## Type this to start grass from permanent
 #grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/PERMANENT
 grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/nyc_site_test
-
+grass $GISDBASE$LOCATION$MAPSET
 #### Add GRASS code here:
 
-v.in.ogr" -f "o" input="network_nodes.shp" output="nodes_origin"
-r.in.gdal -o --overwrite input=r_surf.tif output=r_surf
+g.gisenv #check environment
+v.in.ogr -f -o input="network_nodes.shp" output="nodes_origin" #import vector files with nodes
+r.in.gdal -o --overwrite input=maungawhau.tif output=r_surf #import raster image for test
           
-execGRASS("r.in.gdal",flags=c("o","overwrite"), 
-          input="r_surf.tif", 
-          output="r_surf")
-system("r.info r_surf")
-r #check we have the same res, etc.
+r.info r_surf #check raster information 
 
-#### Set region extent and resolution first
-system("g.region -p") #Exaine current region properties
-#system("g.region -p") #Exaine current region properties
+#d.mon start=x0
+d.mon wx0 # start a display window called wx0
 
-system("g.region rast=r_surf")
-system("g.region -p")
+d.rast r_surf # display raster
+d.vect nodes_origin # add vector points on top of raster being displayed
 
-system("v.to.rast --overwrite input=nodes_origin use=attr output=nodes_origin_surf attribute_column=ID")
-system("r.info nodes_origin_surf")
+g.region -p # examine current region
 
-system("r.mapcalc 'r_friction = 1'") #creates a raster with value 1
-system("r.info r_friction")
-d.rast r_surf
+g.region rast=r_surf #make sure we are using the correct settings
+g.region -p
 
+#### Convert vector to raster
+v.to.rast --overwrite input=nodes_origin use=attr output=nodes_origin_surf attribute_column=ID
+r.info nodes_origin_surf
 
-i.group group=r_surf_group input=r_surf
-i.segment group=r_surf_group output=test_segments threshold=0.05 
-
+r.mapcalc 'r_friction = 1' #creates a raster with value 1
+r.info r_friction
+d.rast r_friction
 
 # compute cumulative cost surfaces
-system("r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1")
-#system("r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1")
-
-execGRASS("r.cost", flags=c("k","overwrite"),
-          input="r_surf", 
-          output="r_surf_cost",
-          outdir="r_surf_direction",
-          start_raster="nodes_origin_surf")
+r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1
+r.walk -k --overwrite elev=r_friction friction=r_surf output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1
 
 # compute shortest path from start to end points
 #execGRASS()
 #system("r.drain in=walk.cost out=walk.drain vector_points=end")
-system("r.drain input=walk.cost output=walk.drain vector_points=nodes_origin")
-system("r.drain input=r_surf_cost output=cost_drain vector_points=nodes_origin")
+#system("r.drain input=walk.cost output=walk.drain vector_points=nodes_origin")
+#system("r.drain input=r_surf_cost output=cost_drain vector_points=nodes_origin")
 
-system("r.out.gdal input=walk.drain output=path_r_walk.tif") 
-system("r.out.gdal input=walk.cost output=walk_cost.tif") 
-system("r.out.gdal input=cost_drain output=cost_drain.tif") 
+#system("r.out.gdal input=walk.drain output=path_r_walk.tif") 
+#system("r.out.gdal input=walk.cost output=walk_cost.tif") 
+#system("r.out.gdal input=cost_drain output=cost_drain.tif") 
 
+############## End of script ###################
