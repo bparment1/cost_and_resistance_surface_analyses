@@ -1,37 +1,29 @@
 ##!/bin/bash
 
-grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden
-LOCATION_NAME = connectivy_example
+#LOCATION = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/PERMANENT
+#GISDBASE = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden
+#LOCATION_NAME = connectivy_example
+#MAPSET = PERMANENT
 
-LOCATION = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/PERMANENT
-GISDBASE = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden
-LOCATION_NAME = connectivy_example
-MAPSET = PERMANENT
+#LOCATION = /usr/local/share/grassdata/spearfish70/PERMANENT
+#GISDBASE = /usr/local/share/grassdata
+#LOCATION_NAME = spearfish70
+#MAPSET = PERMANENT
 
-GISDBASE = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden
-#LOCATION = /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/
-LOCATION_NAME = connectivy_example
-MAPSET = nyc_site_test
+#visit example
+#http://ncsu-geoforall-lab.github.io/geospatial-modeling-course/grass/buffers_cost.html
+#https://casoilresource.lawr.ucdavis.edu/software/grass-gis-raster-vector-and-imagery-analysis/raster-operations/simple-comparision-two-least-cost-path-approaches/
 
-LOCATION_NAME=connectivy_example
+### Set path and grass environmental variable
+
 GISDBASE=/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden
+LOCATION_NAME=connectivy_example
 MAPSET=nyc_site_test
 
-LOCATION = /usr/local/share/grassdata/spearfish70/PERMANENT
-GISDBASE = /usr/local/share/grassdata
-LOCATION_NAME = spearfish70
-MAPSET = PERMANENT
+#g.gisenv set="VARIABLE=VALUE"
 
-in_dir_grass <- "/nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden" 
-
-
-gisBase <- '/usr/lib/grass72'
-#gisDbase <- '/nfs/urbangi-data/grassdata'
-gisDbase <- in_dir_grass #should be the same as in_dir
-
-#location <- 'DEM_LiDAR_1ft_2010_Improved_NYC_int'
-location <- 'NYC_example'
-location <- 'connectivy_example'
+# Use export to set shell environmental variable:
+#export VARIABLE=value
 
 #grass75 -text ~/grassdata/mylocation/mymapset
 
@@ -39,8 +31,7 @@ location <- 'connectivy_example'
 ## Type this to start grass from permanent
 #grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/PERMANENT
 grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/nyc_site_test
-grass $GISDBASE$LOCATION$MAPSET
-#### Add GRASS code here:
+#grass $GISDBASE/$LOCATION_NAME/$MAPSET
 
 g.gisenv #check environment
 v.in.ogr -f -o input="network_nodes.shp" output="nodes_origin" #import vector files with nodes
@@ -49,7 +40,7 @@ r.in.gdal -o --overwrite input=maungawhau.tif output=r_surf #import raster image
 r.info r_surf #check raster information 
 
 #d.mon start=x0
-d.mon wx0 # start a display window called wx0
+d.mon start=wx0 # start a display window called wx0
 
 d.rast r_surf # display raster
 d.vect nodes_origin # add vector points on top of raster being displayed
@@ -68,11 +59,66 @@ r.info r_friction
 d.rast r_friction
 
 # compute cumulative cost surfaces
-r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1
-r.walk -k --overwrite elev=r_friction friction=r_surf output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1
+## Does not work
+r.cost -k r_surf output=r_cost start_points=nodes_origin
+#r.cost -k input=r_surf output=r_cost start_points=nodes_origin stop_points=nodes_origin
+
+##### To make this work do this one by one:
+#### Select nodes one by one
+v.extract input=nodes_origin output=node_1 where="ID==1"                    
+v.extract input=nodes_origin output=node_2 where="ID==2"                    
+v.extract input=nodes_origin output=node_3 where="ID==3"                    
+
+#https://casoilresource.lawr.ucdavis.edu/software/grass-gis-raster-vector-and-imagery-analysis/raster-operations/simple-comparision-two-least-cost-path-approaches/
+
+### path 1 to 2
+#r.cost -k --overwrite r_surf output=r_cost start_points=node_1 end
+r.cost -k --overwrite input=r_surf output=r_cost start_points=node_1 stop_points=node_2
+# getleast cost path 
+r.drain --overwrite input=r_cost output=dcost_path_1_2 vector_points=node_2
+r.to.vect input=dcost_path_1_2 output=vcost_path_1_2 type=line
+
+d.rast r_cost
+d.vect vcost_path_1_2
+
+### path 1 to 3
+#r.cost -k --overwrite r_surf output=r_cost start_points=node_1 end
+r.cost -k --overwrite input=r_surf output=r_cost start_points=node_1 stop_points=node_3
+# getleast cost path 
+r.drain input=r_cost output=dcost_path_1_3 vector_points=node_3
+r.to.vect input=dcost_path_1_3 output=vcost_path_1_3 type=line
+
+### path 2 to 3
+#r.cost -k --overwrite r_surf output=r_cost start_points=node_1 end
+r.cost -k --overwrite input=r_surf output=r_cost start_points=node_2 stop_points=node_3
+# getleast cost path 
+r.drain input=r_cost output=dcost_path_2_3 vector_points=node_3
+r.to.vect input=dcost_path_2_3 output=vcost_path_2_3 type=line
+
+#### Generate plot
+
+d.rast r.cost
+d.rast r_surf
+d.vect vcost_path_1_2
+d.vect vcost_path_1_3
+d.vect vcost_path_2_3
+
+#r.drain in=walk.cost out=walk.drain vector_points=end
+
+#r.drain --overwrite input=r_surf output=cost_drain1_2 vector_points=node_2
+#r.drain --overwrite input=r_surf output=cost_drain1_3 vector_points=node_3
+
+#r.path input=r.cost start_coordinates=640206,222795 \
+#    raster_path=walkpath vector_path=walkpath
+    
+
+#r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1
+#r.walk -k --overwrite elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin 
 
 # compute shortest path from start to end points
-#execGRASS()
+#r.drain --overwrite input=walk.cost out=walk.drain vector_points=nodes_origin
+
+
 #system("r.drain in=walk.cost out=walk.drain vector_points=end")
 #system("r.drain input=walk.cost output=walk.drain vector_points=nodes_origin")
 #system("r.drain input=r_surf_cost output=cost_drain vector_points=nodes_origin")
@@ -81,4 +127,4 @@ r.walk -k --overwrite elev=r_friction friction=r_surf output=walk.cost start_poi
 #system("r.out.gdal input=walk.cost output=walk_cost.tif") 
 #system("r.out.gdal input=cost_drain output=cost_drain.tif") 
 
-############## End of script ###################
+#############################  End of script ##################################
