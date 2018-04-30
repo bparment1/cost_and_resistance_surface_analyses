@@ -76,7 +76,7 @@ v.extract input=nodes_origin output=node_3 where="ID==3"
 r.cost -k --overwrite input=r_surf output=r_cost start_points=node_1 stop_points=node_2
 # getleast cost path 
 r.drain --overwrite input=r_cost output=dcost_path_1_2 vector_points=node_2
-r.to.vect input=dcost_path_1_2 output=vcost_path_1_2 type=line
+r.to.vect --overwrite input=dcost_path_1_2 output=vcost_path_1_2 type=line
 
 d.rast r_cost
 d.vect vcost_path_1_2
@@ -85,15 +85,15 @@ d.vect vcost_path_1_2
 #r.cost -k --overwrite r_surf output=r_cost start_points=node_1 end
 r.cost -k --overwrite input=r_surf output=r_cost start_points=node_1 stop_points=node_3
 # getleast cost path 
-r.drain input=r_cost output=dcost_path_1_3 vector_points=node_3
-r.to.vect input=dcost_path_1_3 output=vcost_path_1_3 type=line
+r.drain --overwrite input=r_cost output=dcost_path_1_3 vector_points=node_3
+r.to.vect --overwrite input=dcost_path_1_3 output=vcost_path_1_3 type=line
 
 ### path 2 to 3
 #r.cost -k --overwrite r_surf output=r_cost start_points=node_1 end
 r.cost -k --overwrite input=r_surf output=r_cost start_points=node_2 stop_points=node_3
 # getleast cost path 
-r.drain input=r_cost output=dcost_path_2_3 vector_points=node_3
-r.to.vect input=dcost_path_2_3 output=vcost_path_2_3 type=line
+r.drain --overwrite input=r_cost output=dcost_path_2_3 vector_points=node_3
+r.to.vect --overwrite input=dcost_path_2_3 output=vcost_path_2_3 type=line
 
 #### Generate plot
 
@@ -110,14 +110,12 @@ d.vect vcost_path_2_3
 
 #r.path input=r.cost start_coordinates=640206,222795 \
 #    raster_path=walkpath vector_path=walkpath
-    
 
 #r.walk -k elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin stop_points=nodes_origin lambda=1
 #r.walk -k --overwrite elev=r_surf friction=r_friction output=walk.cost start_points=nodes_origin 
 
 # compute shortest path from start to end points
 #r.drain --overwrite input=walk.cost out=walk.drain vector_points=nodes_origin
-
 
 #system("r.drain in=walk.cost out=walk.drain vector_points=end")
 #system("r.drain input=walk.cost output=walk.drain vector_points=nodes_origin")
