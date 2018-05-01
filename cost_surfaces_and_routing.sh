@@ -33,6 +33,9 @@ MAPSET=nyc_site_test
 grass /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/nyc_site_test
 #grass $GISDBASE/$LOCATION_NAME/$MAPSET
 
+#grass74 -c elevation.tiff -e /path/to/grassdata/test1/
+#grass -c maungawhau.tif -e /nfs/bparmentier-data/Data/projects/urban_garden_pursuit/data_urban_garden/connectivy_example/nyc_site_test
+
 g.gisenv #check environment
 v.in.ogr -f -o input="network_nodes.shp" output="nodes_origin" #import vector files with nodes
 r.in.gdal -o --overwrite input=maungawhau.tif output=r_surf #import raster image for test
@@ -60,7 +63,7 @@ d.rast r_friction
 
 # compute cumulative cost surfaces
 ## Does not work
-r.cost -k r_surf output=r_cost start_points=nodes_origin
+#r.cost -k r_surf output=r_cost start_points=nodes_origin
 #r.cost -k input=r_surf output=r_cost start_points=nodes_origin stop_points=nodes_origin
 
 ##### To make this work do this one by one:
@@ -125,4 +128,39 @@ d.vect vcost_path_2_3
 #system("r.out.gdal input=walk.cost output=walk_cost.tif") 
 #system("r.out.gdal input=cost_drain output=cost_drain.tif") 
 
+####### Now use randomwalk
+
+#http://www.mergili.at/software/randomwalk_manual_20160121_main.html
+
+
+#### Convert vector to raster
+#v.to.rast --overwrite input=nodes_origin use=attr output=nodes_origin_surf attribute_column=ID
+
+v.to.rast --overwrite input=node_1 use=attr output=node_1_rast attribute_column=ID                    
+v.to.rast --overwrite input=node_2 use=attr output=node_2_rast attribute_column=ID                    
+
+r.info node_2_rast
+r.info node_1_rast
+
+r.randomwalk help
+r.randomwalk [-abkmnpqsvx] prefix=string [cores=integer] [cellsize=float]
+[aoicoords=float,...][aoimap=name] elevation=name [releasefile=string] 
+[caserules=integer,integer,...] [releasemap=name] [depositmap=name] [impactmap=name]
+[probmap=name] [scoremap=name] [impactobjects=name] [objectscores=string]
+models=string mparams=string [sampling=integer] [retain=float] [functype=integer]
+[backfile=string] [cdffile=string] [zonalfile=string] [profile=float,...] [--verbose] [--quiet]
+
+r.randomwalk -x prefix="rd" elevation=r_surf releasemap=node_1_rast depositmap=node_2_rast \
+models=1,3,1.9,0.16,0.83,2,1,11,-9999,-9999 mparams=5,20,1000,100,10,5,2
+
+r.randomwalk -x prefix="rd" elevation=r_surf releasemap=node_1_rast depositmap=node_2_rast models=1,3,1.9,0.16,0.83,2,1,11,-9999,-9999 mparams=5,20,1000,100,10,5,2
+
+
+#releasemap
+
+#Name of an optional input integer raster map defining the observed release area of each case. The pixel values have to correspond to the case id given in the releasefile. Zero stands for no case. With the flag x, random walks are started from all pixels of all release areas. If a release probability map (parameter probmap, flags p and x) or a release score map (parameter scoremap, flag q) is provided, the releasemap is not used for the computation, but only for visualization (flag v).
+
+#depositmap
+
+#Name of an optional input integer raster map defining observed deposition area of each case. Positive pixel values define areas with an observed deposition, pixel values of zero define areas without observed deposition. This map is needed for validation and visualization only (flag v). For validation purposes it is recommended to set the part of the impact area (parameter impactmap) not defined as deposition area to no data.
 #############################  End of script ##################################
